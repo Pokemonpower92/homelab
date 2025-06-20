@@ -1,0 +1,5 @@
+.env
+ansible/group_vars/all/vault.yml
+*.retry
+.DS_Store
+.vault_password

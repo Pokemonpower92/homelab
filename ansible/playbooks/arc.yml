@@ -1,0 +1,174 @@
+---
+- name: Install Official Actions Runner Controller
+  hosts: k3s_masters[0]
+  
+  tasks:          
+    - name: Install cert-manager
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: https://github.com/cert-manager/cert-manager/releases/download/v1.13.3/cert-manager.yaml
+
+    - name: Wait for cert-manager pods to be ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: cert-manager
+        label_selectors:
+          - app.kubernetes.io/name=cert-manager
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 600
+
+    - name: Wait for cert-manager webhook to be ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: cert-manager
+        label_selectors:
+          - app.kubernetes.io/name=webhook
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 600
+
+    - name: Wait for cert-manager CA injector to be ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: cert-manager
+        label_selectors:
+          - app.kubernetes.io/name=cainjector
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 600
+
+    - name: Create actions-runner-system namespace
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        name: actions-runner-system
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: Create GitHub token secret
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: controller-manager
+            namespace: actions-runner-system
+          type: Opaque
+          stringData:
+            github_token: "{{ github_pat }}"
+
+    - name: Install ARC Controller (updated version)
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        state: present
+        src: https://github.com/actions/actions-runner-controller/releases/download/v0.27.6/actions-runner-controller.yaml
+
+    - name: Wait for ARC webhook service to be ready
+      kubernetes.core.k8s_info:
+        kubeconfig: "{{ kubeconfig }}"
+        api_version: v1
+        kind: Pod
+        namespace: actions-runner-system
+        label_selectors:
+          - control-plane=controller-manager
+        wait: true
+        wait_condition:
+          type: Ready
+          status: "True"
+        wait_timeout: 600
+
+    # Wait a bit more for webhooks to be fully configured
+    - name: Wait for webhook configuration to stabilize
+      pause:
+        seconds: 30
+
+    - name: Create RunnerDeployment RBAC
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRole
+          metadata:
+            name: actions-runner-deploy
+          rules:
+          - apiGroups: [""]
+            resources: ["namespaces", "secrets", "services", "pods", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
+            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+          - apiGroups: ["apps"]
+            resources: ["deployments", "replicasets"]
+            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+          - apiGroups: ["batch"]
+            resources: ["jobs", "cronjobs"]
+            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+          - apiGroups: ["networking.k8s.io"]
+            resources: ["ingresses", "networkpolicies"]
+            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+          - apiGroups: ["rbac.authorization.k8s.io"]
+            resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+
+    - name: Bind ClusterRole to runner ServiceAccount
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: rbac.authorization.k8s.io/v1
+          kind: ClusterRoleBinding
+          metadata:
+            name: actions-runner-deploy-binding
+          subjects:
+          - kind: ServiceAccount
+            name: default
+            namespace: actions-runner-system
+          roleRef:
+            kind: ClusterRole
+            name: actions-runner-deploy
+            apiGroup: rbac.authorization.k8s.io
+
+    - name: Create runner deployments for each repo
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: actions.summerwind.dev/v1alpha1
+          kind: RunnerDeployment
+          metadata:
+            name: "{{ item.name }}-runners"
+            namespace: actions-runner-system
+          spec:
+            replicas: 1
+            template:
+              spec:
+                repository: "{{ item.url | regex_replace('https://github.com/') }}"
+                labels:
+                  - "k3s"
+                  - "self-hosted" 
+                  - "{{ item.name }}"
+        state: present
+      vars:
+        replica_count: "{{ item.min_runners | int }}"
+      loop: "{{ github_repos }}"
+      
+    - name: Display runner summary
+      debug:
+        msg: |
+          ARC installed successfully!
+          
+          To use in workflows:
+          jobs:
+            build:
+              runs-on: [self-hosted, k3s, {{ item.name }}]
+      loop: "{{ github_repos }}"

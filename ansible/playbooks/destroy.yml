@@ -1,0 +1,39 @@
+- name: Destroy K3s Cluster
+  hosts: k3s_cluster
+  become: yes
+  tasks:
+    - name: Stop and disable K3s
+      systemd:
+        name: k3s
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+      
+    - name: Stop and disable K3s agent
+      systemd:
+        name: k3s-agent
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+      
+    - name: Run K3s uninstall script
+      shell: /usr/local/bin/k3s-uninstall.sh
+      ignore_errors: yes
+      when: inventory_hostname in groups['k3s_masters']
+      
+    - name: Run K3s agent uninstall script
+      shell: /usr/local/bin/k3s-agent-uninstall.sh
+      ignore_errors: yes
+      when: inventory_hostname in groups['k3s_workers']
+      
+    - name: Clean up directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/rancher
+        - /var/lib/rancher
+        - /var/lib/kubelet
+        - /var/lib/cni
+        - /opt/cni
+      ignore_errors: yes

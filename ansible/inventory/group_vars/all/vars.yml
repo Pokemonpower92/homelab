@@ -1,0 +1,11 @@
+---
+k3s_version: v1.28.5+k3s1
+kubeconfig: /etc/rancher/k3s/k3s.yaml
+arc_namespace: "arc-system"
+runners_namespace: "arc-runners"
+
+github_repos:
+  - name: "pixels"
+    url: "https://github.com/Pokemonpower92/pixels"
+    min_runners: 1
+    max_runners: 3
