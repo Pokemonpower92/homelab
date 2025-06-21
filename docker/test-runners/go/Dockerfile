@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy test runner script
 COPY run_test.shs.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/run_test.shs.sh
+RUN chmod +x /usr/local/binrun_test.sh
 
 # Set working directory
 WORKDIR /workspace
