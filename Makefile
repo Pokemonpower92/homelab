@@ -6,10 +6,10 @@ install-deps:
 	ansible-galaxy install -r ansible/requirements.yml
 
 encrypt-secrets:
-	ansible-vault encrypt ansible/group_vars/all/vault.yml
+	ansible-vault encrypt --vault-password-file .vault_password ansible/inventory/group_vars/all/vault.yml
 
 decrypt-secrets:
-	ansible-vault decrypt ansible/group_vars/all/vault.yml
+	ansible-vault decrypt --vault-password-file .vault_password ansible/inventory/group_vars/all/vault.yml
 
 cluster:
 	cd ansible && ansible-playbook -i inventory/hosts.yml playbooks/k3s-cluster.yml --vault-password-file ../.vault_password --ask-become-pass
@@ -19,6 +19,9 @@ arc:
 	
 argocd:
 	cd ansible && ansible-playbook -i inventory/hosts.yml playbooks/argocd.yml --vault-password-file ../.vault_password --ask-become-pass
+
+argo-workflow:
+	cd ansible && ansible-playbook -i inventory/hosts.yml playbooks/argo-workflow.yml --vault-password-file ../.vault_password --ask-become-pass
 
 destroy:
 	cd ansible && ansible-playbook -i inventory/hosts.yml playbooks/destroy.yml --vault-password-file ../.vault_password --ask-become-pass

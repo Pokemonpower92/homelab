@@ -1,0 +1,73 @@
+name: Build Test Runner Images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "docker/**"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      short_sha: ${{ steps.set-sha.outputs.short_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect test runners
+        id: set-matrix
+        run: |
+          RUNNERS=$(find docker/test-runners -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+          echo "matrix={\"runner\":$RUNNERS}" >> $GITHUB_OUTPUT
+      - name: Set short SHA
+        id: set-sha
+        run: |
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+  build-and-push:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        runner: ${{ fromJson(needs.detect-changes.outputs.matrix).runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create new tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git tag "test-runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
+          git push origin "test-runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set repository name
+        id: repo
+        run: |
+          echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      - name: Build and push test runner
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/test-runners/${{ matrix.runner }}
+          file: docker/test-runners/${{ matrix.runner }}/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.repo }}/test-runner-${{ matrix.runner }}:${{ needs.detect-changes.outputs.short_sha }}
+            ghcr.io/${{ steps.repo.outputs.repo }}/test-runner-${{ matrix.runner }}:latest
