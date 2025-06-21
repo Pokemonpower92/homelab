@@ -24,7 +24,7 @@ jobs:
       - name: Detect test runners
         id: set-matrix
         run: |
-          RUNNERS=$(find docker/test-runners -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
+          RUNNERS=$(find docker/runners -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | jq -R -s -c 'split("\n")[:-1]')
           echo "matrix={\"runner\":$RUNNERS}" >> $GITHUB_OUTPUT
       - name: Set short SHA
         id: set-sha
@@ -54,8 +54,8 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git tag "test-runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
-          git push origin "test-runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
+          git tag "runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
+          git push origin "runner-${{ matrix.runner }}-${{ needs.detect-changes.outputs.short_sha }}"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Set repository name
@@ -65,9 +65,9 @@ jobs:
       - name: Build and push test runner
         uses: docker/build-push-action@v5
         with:
-          context: docker/test-runners/${{ matrix.runner }}
-          file: docker/test-runners/${{ matrix.runner }}/Dockerfile
+          context: docker/runners/${{ matrix.runner }}
+          file: docker/runners/${{ matrix.runner }}/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ steps.repo.outputs.repo }}/test-runner-${{ matrix.runner }}:${{ needs.detect-changes.outputs.short_sha }}
-            ghcr.io/${{ steps.repo.outputs.repo }}/test-runner-${{ matrix.runner }}:latest
+            ghcr.io/${{ steps.repo.outputs.repo }}/runner-${{ matrix.runner }}:${{ needs.detect-changes.outputs.short_sha }}
+            ghcr.io/${{ steps.repo.outputs.repo }}/runner-${{ matrix.runner }}:latest

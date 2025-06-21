@@ -23,34 +23,6 @@
           status: "True"
         wait_timeout: 600
 
-    - name: Wait for cert-manager webhook to be ready
-      kubernetes.core.k8s_info:
-        kubeconfig: "{{ kubeconfig }}"
-        api_version: v1
-        kind: Pod
-        namespace: cert-manager
-        label_selectors:
-          - app.kubernetes.io/name=webhook
-        wait: true
-        wait_condition:
-          type: Ready
-          status: "True"
-        wait_timeout: 600
-
-    - name: Wait for cert-manager CA injector to be ready
-      kubernetes.core.k8s_info:
-        kubeconfig: "{{ kubeconfig }}"
-        api_version: v1
-        kind: Pod
-        namespace: cert-manager
-        label_selectors:
-          - app.kubernetes.io/name=cainjector
-        wait: true
-        wait_condition:
-          type: Ready
-          status: "True"
-        wait_timeout: 600
-
     - name: Create actions-runner-system namespace
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
@@ -72,7 +44,7 @@
           stringData:
             github_token: "{{ github_pat }}"
 
-    - name: Install ARC Controller (updated version)
+    - name: Install ARC Controller
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
         state: present
@@ -92,7 +64,6 @@
           status: "True"
         wait_timeout: 600
 
-    # Wait a bit more for webhooks to be fully configured
     - name: Wait for webhook configuration to stabilize
       pause:
         seconds: 30
@@ -139,6 +110,19 @@
             name: actions-runner-deploy
             apiGroup: rbac.authorization.k8s.io
 
+    - name: Create kubeconfig secret for runners
+      kubernetes.core.k8s:
+        kubeconfig: "{{ kubeconfig }}"
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: runner-kubeconfig
+            namespace: actions-runner-system
+          type: Opaque
+          data:
+            config: "{{ lookup('file', '/etc/rancher/k3s/k3s.yaml') | b64encode }}"
+
     - name: Create runner deployments for each repo
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
@@ -157,18 +141,14 @@
                   - "k3s"
                   - "self-hosted" 
                   - "{{ item.name }}"
+                image: "ghcr.io/pokemonpower92/pixels/runner-arc:latest"
+                volumeMounts:
+                - name: kubeconfig
+                  mountPath: /home/runner/.kube
+                  readOnly: true
+                volumes:
+                - name: kubeconfig
+                  secret:
+                    secretName: runner-kubeconfig
         state: present
-      vars:
-        replica_count: "{{ item.min_runners | int }}"
-      loop: "{{ github_repos }}"
-      
-    - name: Display runner summary
-      debug:
-        msg: |
-          ARC installed successfully!
-          
-          To use in workflows:
-          jobs:
-            build:
-              runs-on: [self-hosted, k3s, {{ item.name }}]
       loop: "{{ github_repos }}"
