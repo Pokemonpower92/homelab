@@ -8,8 +8,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy test runner script
-COPY run_test.shs.sh /usr/local/bin/
-RUN chmod +x /usr/local/binrun_test.sh
+COPY run_test.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/run_test.sh
 
 # Set working directory
 WORKDIR /workspace
@@ -17,4 +17,4 @@ WORKDIR /workspace
 # Switch to non-root user (golang image provides 'nobody' or create one)
 USER 65534:65534
 
-ENTRYPOINT ["run_test.shs.sh"]
+ENTRYPOINT ["run_test.sh"]
