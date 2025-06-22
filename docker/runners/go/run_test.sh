@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-SERVICE_NAME=${1:-"api"}
+SUITE=${1:-"test"}
 
-echo "🧪 Running e2e tests for $SERVICE_NAME"
+echo "🧪 Running  for $SERVICE_NAME"
 
 # Run the appropriate tests
-make test-e2e
+make $SUITE
 
 echo "✅ Tests completed"

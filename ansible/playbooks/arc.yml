@@ -44,7 +44,7 @@
           stringData:
             github_token: "{{ github_pat }}"
 
-    - name: Install ARC Controller
+    - name: Install ARC Controller (updated version)
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
         state: present
@@ -110,6 +110,15 @@
             name: actions-runner-deploy
             apiGroup: rbac.authorization.k8s.io
 
+    - name: Read kubeconfig from remote host
+      slurp:
+        src: "{{ kubeconfig }}"
+      register: kubeconfig_data
+
+    - name: Prepare kubeconfig for runners
+      set_fact:
+        runner_kubeconfig: "{{ kubeconfig_data.content | b64decode | regex_replace('127.0.0.1', ansible_host) | b64encode }}"
+
     - name: Create kubeconfig secret for runners
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
@@ -121,7 +130,7 @@
             namespace: actions-runner-system
           type: Opaque
           data:
-            config: "{{ lookup('file', '/etc/rancher/k3s/k3s.yaml') | b64encode }}"
+            config: "{{ runner_kubeconfig }}"
 
     - name: Create runner deployments for each repo
       kubernetes.core.k8s:
@@ -141,7 +150,7 @@
                   - "k3s"
                   - "self-hosted" 
                   - "{{ item.name }}"
-                image: "ghcr.io/pokemonpower92/pixels/runner-arc:latest"
+                image: "ghcr.io/pokemonpower92/homelab/runner-arc:latest"
                 volumeMounts:
                 - name: kubeconfig
                   mountPath: /home/runner/.kube
