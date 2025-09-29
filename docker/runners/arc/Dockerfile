@@ -8,10 +8,6 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/kubectl
 
-# Install argocd CLI
-RUN curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64 && \
-    chmod +x /usr/local/bin/argocd
-
 # Install additional useful tools
 RUN apt-get update && apt-get install -y \
     git \
