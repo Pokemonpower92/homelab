@@ -1,5 +1,5 @@
 # DinD-enabled ARC runner base image (includes dockerd + runner wiring)
-FROM ghcr.io/actions/actions-runner-controller/actions-runner-dind:latest
+FROM ghcr.io/actions-runner-controller/actions-runner-controller/actions-runner-dind:v2.328.0-ubuntu-20.04-0e006bb
 
 USER root
 
