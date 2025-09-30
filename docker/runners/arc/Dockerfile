@@ -1,13 +1,14 @@
-# DinD-enabled ARC runner base image (includes dockerd + runner wiring)
 FROM ghcr.io/actions-runner-controller/actions-runner-controller/actions-runner-dind:v2.328.0-ubuntu-20.04-0e006bb
 
 USER root
 
-# Install kubectl
 RUN curl -sSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -sSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x /usr/local/bin/kubectl
 
-# Useful tools
+RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash && \
+    mv kustomize /usr/local/bin/kustomize && \
+    chmod +x /usr/local/bin/kustomize
+
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -17,10 +18,9 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Verify installs (no argocd)
 RUN kubectl version --client && echo "Runner DinD image ready"
 
 USER runner
 
-# Prepare kube dir if you mount kubeconfig secrets for jobs
 RUN mkdir -p /home/runner/.kube
+
