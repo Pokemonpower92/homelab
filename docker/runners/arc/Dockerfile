@@ -1,14 +1,13 @@
-# Dockerfile for custom GitHub Actions runner with K8s tools
-FROM summerwind/actions-runner:latest
+# DinD-enabled ARC runner base image (includes dockerd + runner wiring)
+FROM ghcr.io/actions/actions-runner-controller/actions-runner-dind:latest
 
 USER root
 
 # Install kubectl
-RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
-    chmod +x kubectl && \
-    mv kubectl /usr/local/bin/kubectl
+RUN curl -sSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/$(curl -sSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    chmod +x /usr/local/bin/kubectl
 
-# Install additional useful tools
+# Useful tools
 RUN apt-get update && apt-get install -y \
     git \
     curl \
@@ -18,13 +17,10 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Verify installations
-RUN kubectl version --client && \
-    argocd version --client && \
-    echo "Tools installed successfully"
+# Verify installs (no argocd)
+RUN kubectl version --client && echo "Runner DinD image ready"
 
-# Switch back to runner user
 USER runner
 
-# Set up kubeconfig directory
+# Prepare kube dir if you mount kubeconfig secrets for jobs
 RUN mkdir -p /home/runner/.kube

@@ -1,8 +1,8 @@
 ---
 - name: Install Official Actions Runner Controller
   hosts: k3s_masters[0]
-  
-  tasks:          
+
+  tasks:
     - name: Install cert-manager
       kubernetes.core.k8s:
         kubeconfig: "{{ kubeconfig }}"
@@ -77,21 +77,36 @@
           metadata:
             name: actions-runner-deploy
           rules:
-          - apiGroups: [""]
-            resources: ["namespaces", "secrets", "services", "pods", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
-            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
-          - apiGroups: ["apps"]
-            resources: ["deployments", "replicasets"]
-            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
-          - apiGroups: ["batch"]
-            resources: ["jobs", "cronjobs"]
-            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
-          - apiGroups: ["networking.k8s.io"]
-            resources: ["ingresses", "networkpolicies"]
-            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
-          - apiGroups: ["rbac.authorization.k8s.io"]
-            resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
-            verbs: ["get", "list", "create", "update", "patch", "delete", "watch"]
+            - apiGroups: [""]
+              resources:
+                [
+                  "namespaces",
+                  "secrets",
+                  "services",
+                  "pods",
+                  "configmaps",
+                  "serviceaccounts",
+                  "persistentvolumeclaims",
+                ]
+              verbs:
+                ["get", "list", "create", "update", "patch", "delete", "watch"]
+            - apiGroups: ["apps"]
+              resources: ["deployments", "replicasets"]
+              verbs:
+                ["get", "list", "create", "update", "patch", "delete", "watch"]
+            - apiGroups: ["batch"]
+              resources: ["jobs", "cronjobs"]
+              verbs:
+                ["get", "list", "create", "update", "patch", "delete", "watch"]
+            - apiGroups: ["networking.k8s.io"]
+              resources: ["ingresses", "networkpolicies"]
+              verbs:
+                ["get", "list", "create", "update", "patch", "delete", "watch"]
+            - apiGroups: ["rbac.authorization.k8s.io"]
+              resources:
+                ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+              verbs:
+                ["get", "list", "create", "update", "patch", "delete", "watch"]
 
     - name: Bind ClusterRole to runner ServiceAccount
       kubernetes.core.k8s:
@@ -102,9 +117,9 @@
           metadata:
             name: actions-runner-deploy-binding
           subjects:
-          - kind: ServiceAccount
-            name: default
-            namespace: actions-runner-system
+            - kind: ServiceAccount
+              name: default
+              namespace: actions-runner-system
           roleRef:
             kind: ClusterRole
             name: actions-runner-deploy
@@ -148,16 +163,18 @@
                 repository: "{{ item.url | regex_replace('https://github.com/') }}"
                 labels:
                   - "k3s"
-                  - "self-hosted" 
+                  - "self-hosted"
                   - "{{ item.name }}"
                 image: "ghcr.io/pokemonpower92/homelab/runner-arc:latest"
+                ephemeral: true
+                dockerdWithinRunnerContainer: true
                 volumeMounts:
-                - name: kubeconfig
-                  mountPath: /home/runner/.kube
-                  readOnly: true
+                  - name: kubeconfig
+                    mountPath: /home/runner/.kube
+                    readOnly: true
                 volumes:
-                - name: kubeconfig
-                  secret:
-                    secretName: runner-kubeconfig
+                  - name: kubeconfig
+                    secret:
+                      secretName: runner-kubeconfig
         state: present
       loop: "{{ github_repos }}"
